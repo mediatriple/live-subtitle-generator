@@ -130,7 +130,7 @@ async def get_subtitles(
     return SubtitleListResponse(
         stream_id=stream_id,
         items=[
-            SubtitleSegmentResponse.from_segment(item)
+            SubtitleSegmentResponse.from_segment(item, session.started_at)
             for item in session.recent_segments(limit)
         ],
     )
@@ -158,7 +158,10 @@ async def stream_websocket(websocket: WebSocket, stream_id: str) -> None:
                     mode="json"
                 ),
                 "subtitles": [
-                    SubtitleSegmentResponse.from_segment(segment).model_dump(mode="json")
+                    SubtitleSegmentResponse.from_segment(
+                        segment,
+                        session.started_at,
+                    ).model_dump(mode="json")
                     for segment in session.recent_segments(limit=100)
                 ],
             }
@@ -169,7 +172,10 @@ async def stream_websocket(websocket: WebSocket, stream_id: str) -> None:
             await websocket.send_json(
                 {
                     "type": "subtitle",
-                    "data": SubtitleSegmentResponse.from_segment(segment).model_dump(mode="json"),
+                    "data": SubtitleSegmentResponse.from_segment(
+                        segment,
+                        session.started_at,
+                    ).model_dump(mode="json"),
                 }
             )
     except WebSocketDisconnect:

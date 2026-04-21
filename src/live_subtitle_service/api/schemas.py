@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -85,9 +85,24 @@ class SubtitleSegmentResponse(BaseModel):
     text: str
     raw_text: str
     created_at: datetime
+    source_end_at: datetime | None = None
+    processing_latency_ms: int | None = None
 
     @classmethod
-    def from_segment(cls, segment: SubtitleSegment) -> SubtitleSegmentResponse:
+    def from_segment(
+        cls,
+        segment: SubtitleSegment,
+        session_started_at: datetime | None = None,
+    ) -> SubtitleSegmentResponse:
+        source_end_at = None
+        processing_latency_ms = None
+        if session_started_at is not None:
+            source_end_at = session_started_at + timedelta(milliseconds=max(0, segment.end_ms))
+            processing_latency_ms = max(
+                0,
+                int(round((segment.created_at - source_end_at).total_seconds() * 1000)),
+            )
+
         return cls(
             stream_id=segment.stream_id,
             sequence=segment.sequence,
@@ -96,6 +111,8 @@ class SubtitleSegmentResponse(BaseModel):
             text=segment.text,
             raw_text=segment.raw_text,
             created_at=segment.created_at,
+            source_end_at=source_end_at,
+            processing_latency_ms=processing_latency_ms,
         )
 
 
