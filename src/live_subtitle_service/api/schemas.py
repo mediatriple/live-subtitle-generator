@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from live_subtitle_service.config import Settings
+from live_subtitle_service.config import ALLOWED_TRANSCRIPTION_MODELS, Settings
 from live_subtitle_service.domain.models import StreamRequest, StreamStatus, SubtitleSegment
 from live_subtitle_service.services.session import StreamSession
 
@@ -51,6 +51,19 @@ class CreateStreamRequest(BaseModel):
         cleaned = value.strip()
         return cleaned or None
 
+    @field_validator("model")
+    @classmethod
+    def validate_model(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if cleaned == "":
+            return None
+        if cleaned not in ALLOWED_TRANSCRIPTION_MODELS:
+            allowed = ", ".join(ALLOWED_TRANSCRIPTION_MODELS)
+            raise ValueError(f"model must be one of {allowed}")
+        return cleaned
+
     @model_validator(mode="after")
     def validate_window(self) -> CreateStreamRequest:
         if self.chunk_seconds is not None and self.overlap_seconds is not None:
@@ -83,11 +96,7 @@ class CreateStreamRequest(BaseModel):
         )
 
     def _is_broadcast_preview(self) -> bool:
-        return (
-            (self.external_id or "").startswith("broadcast_")
-            or (self.metadata.get("broadcast_uid") or "").startswith("broadcast_")
-            or self.metadata.get("feature") == "player-preview-live"
-        )
+        return self.metadata.get("feature") == "player-preview-live"
 
 
 class SubtitleSegmentResponse(BaseModel):

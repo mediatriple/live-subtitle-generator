@@ -44,7 +44,7 @@ curl -X POST http://localhost:8000/api/v1/streams \
     "source_url": "https://example.com/live/playlist.m3u8",
     "external_id": "videoonly-v2:live-crop:account-uuid:broadcast-id",
     "language": "tr",
-    "model": "small",
+    "model": "medium",
     "chunk_seconds": 4,
     "overlap_seconds": 0.75
   }'
@@ -104,7 +104,7 @@ cp .env.example .env
 First run notes:
 
 - On first use, the selected Whisper model is downloaded into `LSS_WHISPER_DOWNLOAD_ROOT`.
-- For a CPU-only machine, start with `tiny`, `base`, or `small`.
+- For a CPU-only machine, use `tiny`, `base`, `small`, or `medium` depending on the latency budget.
 - Defaults are tuned for CPU execution: `device=cpu`, `compute_type=int8`.
 
 Run:
@@ -189,7 +189,7 @@ a similar shared store.
 ## Operational notes
 
 - Source URLs must be readable by `ffmpeg`.
-- The `model` field is a local Whisper model name such as `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo`, or a local converted model path.
+- The `model` field accepts `tiny`, `base`, `small`, or `medium`; `medium` is the largest supported live subtitle model.
 - The service currently stores stream state and subtitle history in memory. For multi-instance deployment, move stream/session state to Redis or a database and use a pub/sub layer for WebSocket fan-out.
 - If you need higher throughput later, keep the same service shape and scale by running multiple workers or assigning different streams to separate Whisper model processes.
 
@@ -204,7 +204,7 @@ The current code can manage multiple streams in one process, but it is important
 For a small deployment, this is enough:
 
 - Run one API process.
-- Use `tiny`, `base`, `small`, or `turbo` on CPU.
+- Use `tiny`, `base`, `small`, or `medium` on CPU.
 - Keep queues small so the system drops old chunks instead of building unbounded latency.
 - If one stream is business-critical, give it a dedicated process instead of mixing it with lower-priority streams.
 
@@ -223,14 +223,14 @@ Recommended production pattern:
 
 - Use Redis Streams, NATS, or Kafka between ingest and transcription.
 - Route each stream to a stable ASR worker to preserve ordering and reduce cross-worker coordination.
-- Group workers by model profile, for example `small` CPU workers and `large-v3` GPU workers.
+- Group workers by model profile, for example `small` and `medium` worker pools.
 - Keep one model loaded per worker process instead of reloading per request.
 - Publish subtitle events through Redis pub/sub or a similar bus so WebSocket servers can scale horizontally.
 
 Practical capacity advice:
 
-- CPU + `large-v3` is not a realistic target for many live streams.
-- CPU fleets should prefer `small`, `medium`, or `turbo`, depending on the latency budget.
+- Models larger than `medium` are intentionally not supported for live subtitle streams.
+- CPU fleets should prefer `small` or `medium`, depending on the latency budget.
 - If you want many concurrent streams with higher accuracy, move inference to GPU and scale by worker count per GPU.
 - If you run on Apple Silicon, benchmark `whisper.cpp` with Metal or `mlx-whisper` against `faster-whisper` before standardizing the runtime.
 

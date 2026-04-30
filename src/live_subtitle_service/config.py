@@ -5,6 +5,8 @@ from functools import lru_cache
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+ALLOWED_TRANSCRIPTION_MODELS = ("tiny", "base", "small", "medium")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -23,7 +25,7 @@ class Settings(BaseSettings):
     public_ws_base_url: str | None = None
     cors_allowed_origins: str = ""
 
-    default_transcription_model: str = "small"
+    default_transcription_model: str = "medium"
     transcription_device: str = "cpu"
     transcription_compute_type: str = "int8"
     transcription_cpu_threads: int = 0
@@ -63,6 +65,11 @@ class Settings(BaseSettings):
             raise ValueError("transcription_beam_size must be greater than zero")
         if not 0 <= self.transcription_language_lock_min_probability <= 1:
             raise ValueError("transcription_language_lock_min_probability must be between 0 and 1")
+        if self.default_transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
+            raise ValueError(
+                "default_transcription_model must be one of "
+                + ", ".join(ALLOWED_TRANSCRIPTION_MODELS)
+            )
         return self
 
 

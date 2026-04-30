@@ -130,11 +130,11 @@ Isolation rules:
 
 ## Model strategy
 
-For 100 concurrent streams, do not plan around `large-v3` on CPU.
+For 100 concurrent streams, do not plan around models larger than `medium`.
 
 Recommended tiers:
 
-- default tier: `small`, `medium`, or `turbo`
+- default tier: `small` or `medium`
 - high-accuracy tier: GPU-backed worker pool
 - language-specific optimization: use fixed language when known to avoid repeated language detection cost
 
@@ -146,7 +146,7 @@ Do not guess final worker counts. Benchmark them.
 
 Benchmark matrix:
 
-- model: `small`, `medium`, `turbo`, and any premium model tier
+- model: `small` and `medium`
 - hardware: CPU node type and GPU node type
 - chunk size: 2.5s, 3.0s, 4.0s
 - overlap: 0.25s and 0.5s
