@@ -5,7 +5,26 @@ from functools import lru_cache
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ALLOWED_TRANSCRIPTION_MODELS = ("tiny", "base", "small", "medium")
+ALLOWED_TRANSCRIPTION_MODELS = (
+    "tiny",
+    "tiny.en",
+    "base",
+    "base.en",
+    "small",
+    "small.en",
+    "medium",
+    "medium.en",
+    "large",
+    "large-v1",
+    "large-v2",
+    "large-v3",
+    "large-v3-turbo",
+    "turbo",
+    "distil-small.en",
+    "distil-medium.en",
+    "distil-large-v2",
+    "distil-large-v3",
+)
 
 
 def normalize_transcription_model(value: str | None, fallback: str = "medium") -> str:

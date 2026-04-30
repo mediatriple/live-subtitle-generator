@@ -73,7 +73,7 @@ def test_create_stream_request_preserves_admin_model_for_broadcast_live_crop() -
     assert domain.model == "medium"
 
 
-def test_create_stream_request_clamps_models_larger_than_medium() -> None:
+def test_create_stream_request_preserves_large_v3_model() -> None:
     request = CreateStreamRequest(
         source_url="https://example.com/live/custom.m3u8",
         external_id="custom-stream",
@@ -83,4 +83,4 @@ def test_create_stream_request_clamps_models_larger_than_medium() -> None:
 
     domain = request.to_domain(Settings(default_transcription_model="large-v3"))
 
-    assert domain.model == "medium"
+    assert domain.model == "large-v3"

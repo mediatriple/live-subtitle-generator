@@ -104,7 +104,7 @@ cp .env.example .env
 First run notes:
 
 - On first use, the selected Whisper model is downloaded into `LSS_WHISPER_DOWNLOAD_ROOT`.
-- For a CPU-only machine, use `tiny`, `base`, `small`, or `medium` depending on the latency budget.
+- For a CPU-only machine, use `tiny`, `base`, `small`, or `medium` depending on the latency budget. Larger Whisper and distil models are accepted, but need more memory/compute.
 - Defaults are tuned for CPU execution: `device=cpu`, `compute_type=int8`.
 
 Run:
@@ -189,7 +189,7 @@ a similar shared store.
 ## Operational notes
 
 - Source URLs must be readable by `ffmpeg`.
-- The `model` field accepts `tiny`, `base`, `small`, or `medium`; `medium` is the largest supported live subtitle model.
+- The `model` field accepts the supported Whisper/faster-whisper model names: `tiny`, `tiny.en`, `base`, `base.en`, `small`, `small.en`, `medium`, `medium.en`, `large`, `large-v1`, `large-v2`, `large-v3`, `large-v3-turbo`, `turbo`, `distil-small.en`, `distil-medium.en`, `distil-large-v2`, and `distil-large-v3`.
 - The service currently stores stream state and subtitle history in memory. For multi-instance deployment, move stream/session state to Redis or a database and use a pub/sub layer for WebSocket fan-out.
 - If you need higher throughput later, keep the same service shape and scale by running multiple workers or assigning different streams to separate Whisper model processes.
 
@@ -204,7 +204,7 @@ The current code can manage multiple streams in one process, but it is important
 For a small deployment, this is enough:
 
 - Run one API process.
-- Use `tiny`, `base`, `small`, or `medium` on CPU.
+- Use `tiny`, `base`, `small`, or `medium` on CPU unless the host has enough capacity for larger models.
 - Keep queues small so the system drops old chunks instead of building unbounded latency.
 - If one stream is business-critical, give it a dedicated process instead of mixing it with lower-priority streams.
 
