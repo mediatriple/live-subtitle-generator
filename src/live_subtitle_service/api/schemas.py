@@ -207,6 +207,12 @@ class HealthResponse(BaseModel):
     version: str
 
 
+class ModelStatusResponse(BaseModel):
+    name: str
+    downloaded: bool
+    loaded: bool
+
+
 def _absolute_url(base_url: str | None, path: str) -> str:
     if not base_url:
         return path

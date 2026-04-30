@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 from faster_whisper import WhisperModel
 
-from live_subtitle_service.config import Settings
+from live_subtitle_service.config import ALLOWED_TRANSCRIPTION_MODELS, Settings
 from live_subtitle_service.domain.models import AudioChunk, StreamRequest, TranscriptionResult
 from live_subtitle_service.utils.audio import pcm16_to_float32_array
 
@@ -27,6 +28,26 @@ class LocalWhisperTranscriptionClient:
 
     async def aclose(self) -> None:
         return None
+
+    async def list_models(self) -> list[dict[str, object]]:
+        loaded = set(self._models.keys())
+        return [
+            {
+                "name": model_name,
+                "downloaded": self.is_model_downloaded(model_name),
+                "loaded": model_name in loaded,
+            }
+            for model_name in ALLOWED_TRANSCRIPTION_MODELS
+        ]
+
+    async def ensure_model(self, model_name: str) -> dict[str, object]:
+        await self._get_runtime(model_name)
+        self._write_download_marker(model_name)
+        return {
+            "name": model_name,
+            "downloaded": self.is_model_downloaded(model_name),
+            "loaded": model_name in self._models,
+        }
 
     async def transcribe(
         self,
@@ -69,6 +90,34 @@ class LocalWhisperTranscriptionClient:
 
         return WhisperModel(model_name, **kwargs)
 
+    def is_model_downloaded(self, model_name: str) -> bool:
+        if model_name in self._models:
+            return True
+
+        if self._download_marker_path(model_name).is_file():
+            return True
+
+        return self._model_cache_path(model_name).exists()
+
+    def _write_download_marker(self, model_name: str) -> None:
+        marker = self._download_marker_path(model_name)
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text("ready\n", encoding="utf-8")
+        except OSError:
+            logger.warning("Unable to write model download marker", extra={"model": model_name})
+
+    def _download_marker_path(self, model_name: str) -> Path:
+        root = Path(self._settings.whisper_download_root or ".cache/whisper")
+        return root / ".videoonly-models" / f"{self._safe_model_key(model_name)}.ready"
+
+    def _model_cache_path(self, model_name: str) -> Path:
+        root = Path(self._settings.whisper_download_root or ".cache/whisper")
+        return root / f"models--Systran--faster-whisper-{model_name}"
+
+    def _safe_model_key(self, model_name: str) -> str:
+        return model_name.replace("/", "__").replace(":", "_")
+
     def _transcribe_sync(
         self,
         model: WhisperModel,
@@ -82,9 +131,7 @@ class LocalWhisperTranscriptionClient:
             condition_on_previous_text=self._settings.transcription_condition_on_previous_text,
             vad_filter=self._settings.transcription_vad_filter,
         )
-        transcript_parts = [
-            segment.text.strip() for segment in segments if segment.text.strip()
-        ]
+        transcript_parts = [segment.text.strip() for segment in segments if segment.text.strip()]
         detected_language = None
         detected_language_probability = None
         if language is None:

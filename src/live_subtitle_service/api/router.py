@@ -14,12 +14,14 @@ from live_subtitle_service import __version__
 from live_subtitle_service.api.schemas import (
     CreateStreamRequest,
     HealthResponse,
+    ModelStatusResponse,
     StreamResponse,
     SubtitleListResponse,
     SubtitleSegmentResponse,
 )
-from live_subtitle_service.config import Settings
+from live_subtitle_service.config import Settings, normalize_transcription_model
 from live_subtitle_service.services.manager import StreamManager, StreamNotFoundError
+from live_subtitle_service.transcription.local_whisper import LocalWhisperTranscriptionClient
 
 router = APIRouter()
 
@@ -32,6 +34,10 @@ def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
+def get_transcriber(request: Request) -> LocalWhisperTranscriptionClient | None:
+    return getattr(request.app.state, "transcriber", None)
+
+
 @router.get("/healthz", response_model=HealthResponse)
 async def healthcheck(settings: Settings = Depends(get_app_settings)) -> HealthResponse:
     return HealthResponse(
@@ -39,6 +45,31 @@ async def healthcheck(settings: Settings = Depends(get_app_settings)) -> HealthR
         service=settings.app_name,
         version=__version__,
     )
+
+
+@router.get("/models", response_model=list[ModelStatusResponse])
+async def list_models(
+    transcriber: LocalWhisperTranscriptionClient | None = Depends(get_transcriber),
+) -> list[ModelStatusResponse]:
+    if transcriber is None:
+        raise HTTPException(status_code=503, detail="transcriber is not available")
+
+    return [ModelStatusResponse(**item) for item in await transcriber.list_models()]
+
+
+@router.post("/models/{model_name:path}/download", response_model=ModelStatusResponse)
+async def download_model(
+    model_name: str,
+    transcriber: LocalWhisperTranscriptionClient | None = Depends(get_transcriber),
+) -> ModelStatusResponse:
+    if transcriber is None:
+        raise HTTPException(status_code=503, detail="transcriber is not available")
+
+    normalized = normalize_transcription_model(model_name, fallback="")
+    if normalized == "":
+        raise HTTPException(status_code=422, detail="unsupported model")
+
+    return ModelStatusResponse(**await transcriber.ensure_model(normalized))
 
 
 @router.post("/streams", response_model=StreamResponse, status_code=201)
@@ -154,9 +185,7 @@ async def stream_websocket(websocket: WebSocket, stream_id: str) -> None:
         await websocket.send_json(
             {
                 "type": "snapshot",
-                "stream": StreamResponse.from_session(session, settings).model_dump(
-                    mode="json"
-                ),
+                "stream": StreamResponse.from_session(session, settings).model_dump(mode="json"),
                 "subtitles": [
                     SubtitleSegmentResponse.from_segment(
                         segment,

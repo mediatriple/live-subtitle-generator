@@ -41,6 +41,7 @@ def create_app(
     async def lifespan(app: FastAPI):
         app.state.settings = resolved_settings
         app.state.stream_manager = manager
+        app.state.transcriber = transcriber
         try:
             yield
         finally:
