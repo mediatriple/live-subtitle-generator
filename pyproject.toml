@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "live-subtitle-service"
-version = "0.1.2"
+version = "0.1.3"
 description = "Realtime subtitle generation service for live streams using ffmpeg and local Whisper models."
 readme = "README.md"
 requires-python = ">=3.11"
