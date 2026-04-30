@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ALLOWED_TRANSCRIPTION_MODELS = ("tiny", "base", "small", "medium")
+
+
+def normalize_transcription_model(value: str | None, fallback: str = "medium") -> str:
+    cleaned = str(value or "").strip().lower()
+    if cleaned in ALLOWED_TRANSCRIPTION_MODELS:
+        return cleaned
+    return fallback
 
 
 class Settings(BaseSettings):
@@ -45,6 +52,11 @@ class Settings(BaseSettings):
     max_segments_per_stream: int = 500
     shutdown_timeout_seconds: float = 10.0
 
+    @field_validator("default_transcription_model", mode="before")
+    @classmethod
+    def normalize_default_transcription_model(cls, value: str | None) -> str:
+        return normalize_transcription_model(value)
+
     @model_validator(mode="after")
     def validate_audio_window(self) -> Settings:
         if self.chunk_seconds <= 0:
@@ -65,11 +77,6 @@ class Settings(BaseSettings):
             raise ValueError("transcription_beam_size must be greater than zero")
         if not 0 <= self.transcription_language_lock_min_probability <= 1:
             raise ValueError("transcription_language_lock_min_probability must be between 0 and 1")
-        if self.default_transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
-            raise ValueError(
-                "default_transcription_model must be one of "
-                + ", ".join(ALLOWED_TRANSCRIPTION_MODELS)
-            )
         return self
 
 

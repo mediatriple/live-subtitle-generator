@@ -6,6 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from live_subtitle_service import __version__
 from live_subtitle_service.api.responses import UTF8JSONResponse
 from live_subtitle_service.api.router import router
 from live_subtitle_service.config import Settings, get_settings
@@ -49,7 +50,7 @@ def create_app(
 
     app = FastAPI(
         title=resolved_settings.app_name,
-        version="0.1.1",
+        version=__version__,
         lifespan=lifespan,
         default_response_class=UTF8JSONResponse,
     )

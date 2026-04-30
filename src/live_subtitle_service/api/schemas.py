@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from live_subtitle_service.config import ALLOWED_TRANSCRIPTION_MODELS, Settings
+from live_subtitle_service.config import Settings, normalize_transcription_model
 from live_subtitle_service.domain.models import StreamRequest, StreamStatus, SubtitleSegment
 from live_subtitle_service.services.session import StreamSession
 
@@ -59,10 +59,7 @@ class CreateStreamRequest(BaseModel):
         cleaned = value.strip()
         if cleaned == "":
             return None
-        if cleaned not in ALLOWED_TRANSCRIPTION_MODELS:
-            allowed = ", ".join(ALLOWED_TRANSCRIPTION_MODELS)
-            raise ValueError(f"model must be one of {allowed}")
-        return cleaned
+        return normalize_transcription_model(cleaned)
 
     @model_validator(mode="after")
     def validate_window(self) -> CreateStreamRequest:
