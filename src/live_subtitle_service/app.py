@@ -49,7 +49,7 @@ def create_app(
 
     app = FastAPI(
         title=resolved_settings.app_name,
-        version="0.1.0",
+        version="0.1.1",
         lifespan=lifespan,
         default_response_class=UTF8JSONResponse,
     )

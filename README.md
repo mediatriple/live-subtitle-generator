@@ -157,7 +157,7 @@ It creates:
 
 Before applying, adjust these values if the cluster IP or panel host changes:
 
-- image: `mediatriple/live-subtitle-generator:latest`
+- image: `mediatriple/live-subtitle-generator:0.1.1`
 - public HTTP base URL: `http://185.70.96.4:8000`
 - public WebSocket base URL: `ws://185.70.96.4:8000`
 - CORS origins: `https://panelpp.mediatriple.net,http://panelpp.mediatriple.net`
