@@ -63,3 +63,19 @@ async def test_manager_reuses_active_external_stream() -> None:
 
     stopped = await manager.stop_stream_by_external_id(request.external_id)
     assert stopped.status == StreamStatus.STOPPED
+
+
+async def test_manager_await_task_ignores_cancelled_task() -> None:
+    settings = Settings()
+    manager = StreamManager(settings=settings, runner_factory=WaitingRunner)
+    ready = asyncio.Event()
+
+    async def wait_forever() -> None:
+        ready.set()
+        await asyncio.sleep(3600)
+
+    task = asyncio.create_task(wait_forever())
+    await ready.wait()
+    task.cancel()
+
+    await manager._await_task(task)

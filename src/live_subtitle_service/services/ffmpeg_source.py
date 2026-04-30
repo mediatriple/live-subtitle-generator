@@ -4,6 +4,8 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
 from live_subtitle_service.config import Settings
 from live_subtitle_service.domain.models import AudioChunk, StreamRequest
@@ -21,8 +23,9 @@ class FFmpegPCMChunkSource:
         request: StreamRequest,
         stop_event: asyncio.Event,
     ) -> AsyncIterator[AudioChunk]:
+        source_url = await asyncio.to_thread(self._resolve_source_url, request.source_url)
         process = await asyncio.create_subprocess_exec(
-            *self._build_command(request.source_url),
+            *self._build_command(source_url),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -101,9 +104,9 @@ class FFmpegPCMChunkSource:
             "-nostdin",
             "-y",
             "-rw_timeout",
-            "15000000", # 15 saniye timeout (mikrosaniye)
+            "15000000",  # 15 saniye timeout (mikrosaniye)
             "-analyzeduration",
-            "10000000", # 10 saniye analiz
+            "10000000",  # 10 saniye analiz
             "-probesize",
             "10000000",
         ]
@@ -149,6 +152,64 @@ class FFmpegPCMChunkSource:
             ]
         )
         return command
+
+    def _resolve_source_url(self, source_url: str) -> str:
+        if not source_url.startswith(("http://", "https://")) or ".m3u8" not in source_url:
+            return source_url
+
+        try:
+            request = Request(source_url, headers={"User-Agent": "live-subtitle-service/0.1"})
+            with urlopen(request, timeout=5) as response:
+                playlist = response.read(1024 * 1024).decode("utf-8", errors="replace")
+        except Exception:
+            logger.warning("failed to inspect HLS playlist; using original source", exc_info=True)
+            return source_url
+
+        variant_url = self._select_lowest_bandwidth_variant(source_url, playlist)
+        if variant_url:
+            logger.info(
+                "resolved HLS master playlist",
+                extra={"source_url": source_url, "variant_url": variant_url},
+            )
+            return variant_url
+
+        return source_url
+
+    def _select_lowest_bandwidth_variant(self, base_url: str, playlist: str) -> str | None:
+        if "#EXT-X-STREAM-INF" not in playlist:
+            return None
+
+        best: tuple[int, str] | None = None
+        pending_bandwidth: int | None = None
+
+        for raw_line in playlist.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            if line.startswith("#EXT-X-STREAM-INF:"):
+                pending_bandwidth = 10**18
+                attrs = line.split(":", 1)[1]
+                for part in attrs.split(","):
+                    key, _, value = part.partition("=")
+                    if key.strip().upper() == "BANDWIDTH":
+                        try:
+                            pending_bandwidth = int(value.strip().strip('"'))
+                        except ValueError:
+                            pending_bandwidth = 10**18
+                        break
+                continue
+
+            if pending_bandwidth is None:
+                continue
+
+            if not line.startswith("#"):
+                candidate = (pending_bandwidth, urljoin(base_url, line))
+                if best is None or candidate[0] < best[0]:
+                    best = candidate
+                pending_bandwidth = None
+
+        return best[1] if best else None
 
     async def _drain_stderr(self, process: asyncio.subprocess.Process) -> None:
         if process.stderr is None:

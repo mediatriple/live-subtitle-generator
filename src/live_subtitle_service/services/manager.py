@@ -36,7 +36,10 @@ class StreamManager:
                 existing = self._sessions.get(existing_id or "")
                 if existing and existing.status in {StreamStatus.STARTING, StreamStatus.RUNNING}:
                     return existing
-                if existing and existing.status not in {StreamStatus.STARTING, StreamStatus.RUNNING}:
+                if existing and existing.status not in {
+                    StreamStatus.STARTING,
+                    StreamStatus.RUNNING,
+                }:
                     self._sessions.pop(existing.id, None)
 
             session = StreamSession(
@@ -145,6 +148,8 @@ class StreamManager:
                 asyncio.shield(task),
                 timeout=self._settings.shutdown_timeout_seconds,
             )
+        except asyncio.CancelledError:
+            return
         except TimeoutError:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)

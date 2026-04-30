@@ -66,14 +66,27 @@ class CreateStreamRequest(BaseModel):
         if resolved_chunk_seconds <= resolved_overlap_seconds:
             raise ValueError("chunk_seconds must be greater than overlap_seconds")
 
+        resolved_language = self.language
+        resolved_model = self.model or settings.default_transcription_model
+        if self._is_broadcast_preview():
+            resolved_language = None
+            resolved_model = "small"
+
         return StreamRequest(
             source_url=self.source_url,
-            language=self.language,
-            model=self.model or settings.default_transcription_model,
+            language=resolved_language,
+            model=resolved_model,
             chunk_seconds=resolved_chunk_seconds,
             overlap_seconds=resolved_overlap_seconds,
             external_id=self.external_id,
             metadata=self.metadata,
+        )
+
+    def _is_broadcast_preview(self) -> bool:
+        return (
+            (self.external_id or "").startswith("broadcast_")
+            or (self.metadata.get("broadcast_uid") or "").startswith("broadcast_")
+            or self.metadata.get("feature") == "player-preview-live"
         )
 
 
@@ -100,7 +113,7 @@ class SubtitleSegmentResponse(BaseModel):
             source_end_at = session_started_at + timedelta(milliseconds=max(0, segment.end_ms))
             processing_latency_ms = max(
                 0,
-                int(round((segment.created_at - source_end_at).total_seconds() * 1000)),
+                round((segment.created_at - source_end_at).total_seconds() * 1000),
             )
 
         return cls(

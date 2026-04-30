@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from live_subtitle_service.api.schemas import SubtitleSegmentResponse
+from live_subtitle_service.api.schemas import CreateStreamRequest, SubtitleSegmentResponse
+from live_subtitle_service.config import Settings
 from live_subtitle_service.domain.models import SubtitleSegment
 
 
@@ -26,3 +27,32 @@ def test_subtitle_segment_response_includes_source_timing_and_processing_latency
 
     assert response.source_end_at == source_end_at
     assert response.processing_latency_ms == 1350
+
+
+def test_create_stream_request_uses_safe_defaults_for_broadcast_preview() -> None:
+    request = CreateStreamRequest(
+        source_url="https://example.com/live/broadcast_1.smil/playlist.m3u8",
+        external_id="broadcast_1",
+        language="tr",
+        model="large-v3",
+        metadata={"feature": "player-preview-live", "broadcast_uid": "broadcast_1"},
+    )
+
+    domain = request.to_domain(Settings(default_transcription_model="large-v3"))
+
+    assert domain.language is None
+    assert domain.model == "small"
+
+
+def test_create_stream_request_preserves_explicit_values_for_non_broadcast() -> None:
+    request = CreateStreamRequest(
+        source_url="https://example.com/live/custom.m3u8",
+        external_id="custom-stream",
+        language="tr",
+        model="large-v3",
+    )
+
+    domain = request.to_domain(Settings(default_transcription_model="small"))
+
+    assert domain.language == "tr"
+    assert domain.model == "large-v3"
