@@ -80,7 +80,6 @@ class CreateStreamRequest(BaseModel):
         resolved_model = self.model or settings.default_transcription_model
         if self._is_broadcast_preview():
             resolved_language = None
-            resolved_model = "small"
 
         return StreamRequest(
             source_url=self.source_url,

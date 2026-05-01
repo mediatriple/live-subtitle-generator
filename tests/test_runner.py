@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 
 from live_subtitle_service.config import Settings
@@ -35,6 +36,20 @@ class FakeTranscriber:
     ) -> TranscriptionResult:
         self.seen_languages.append(request.language)
         return self._transcripts[chunk.sequence]
+
+
+class BlockingTranscriber(FakeTranscriber):
+    def __init__(self, transcripts: dict[int, TranscriptionResult]) -> None:
+        super().__init__(transcripts)
+        self.can_continue = asyncio.Event()
+
+    async def transcribe(
+        self,
+        chunk: AudioChunk,
+        request: StreamRequest,
+    ) -> TranscriptionResult:
+        await self.can_continue.wait()
+        return await super().transcribe(chunk, request)
 
 
 async def test_runner_deduplicates_chunk_overlap() -> None:
@@ -117,3 +132,50 @@ async def test_runner_locks_detected_language_for_following_chunks() -> None:
     assert transcriber.seen_languages == [None, "en"]
     assert session.detected_language == "en"
     assert session.request.language == "en"
+
+
+async def test_runner_preserves_chunks_when_transcription_lags() -> None:
+    settings = Settings(chunk_queue_size=1, drop_late_chunks=False)
+    request = StreamRequest(
+        source_url="https://example.com/live.m3u8",
+        language="tr",
+        model="small",
+        chunk_seconds=4.0,
+        overlap_seconds=0.75,
+    )
+    session = StreamSession(
+        stream_id="stream-3",
+        request=request,
+        max_segments=10,
+        subscriber_queue_size=2,
+    )
+    transcriber = BlockingTranscriber(
+        {
+            0: TranscriptionResult(text="ilk cumle"),
+            1: TranscriptionResult(text="ikinci cumle"),
+            2: TranscriptionResult(text="ucuncu cumle"),
+        }
+    )
+    runner = SubtitleSessionRunner(
+        audio_source=FakeAudioSource(
+            [
+                AudioChunk(sequence=0, start_ms=0, end_ms=4000, pcm16=b"one"),
+                AudioChunk(sequence=1, start_ms=3250, end_ms=7250, pcm16=b"two"),
+                AudioChunk(sequence=2, start_ms=6500, end_ms=10500, pcm16=b"three"),
+            ]
+        ),
+        transcriber=transcriber,
+        settings=settings,
+    )
+
+    task = asyncio.create_task(runner.run(session))
+    await asyncio.sleep(0)
+    transcriber.can_continue.set()
+    await task
+
+    assert session.dropped_chunks == 0
+    assert [segment.text for segment in session.recent_segments()] == [
+        "ilk cumle",
+        "ikinci cumle",
+        "ucuncu cumle",
+    ]

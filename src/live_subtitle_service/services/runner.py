@@ -69,7 +69,7 @@ class SubtitleSessionRunner:
                 if session.stop_event.is_set():
                     return
 
-                if queue.full():
+                if queue.full() and self._settings.drop_late_chunks:
                     try:
                         queue.get_nowait()
                         session.increment_dropped_chunks()
@@ -78,13 +78,16 @@ class SubtitleSessionRunner:
 
                 await queue.put(chunk)
         finally:
-            while True:
-                try:
-                    queue.put_nowait(None)
-                    break
-                except asyncio.QueueFull:
-                    with contextlib.suppress(asyncio.QueueEmpty):
-                        queue.get_nowait()
+            if not self._settings.drop_late_chunks:
+                await queue.put(None)
+            else:
+                while True:
+                    try:
+                        queue.put_nowait(None)
+                        break
+                    except asyncio.QueueFull:
+                        with contextlib.suppress(asyncio.QueueEmpty):
+                            queue.get_nowait()
 
     async def _consume_chunks(
         self,

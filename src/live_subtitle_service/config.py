@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     chunk_seconds: float = 4.0
     overlap_seconds: float = 0.75
     chunk_queue_size: int = 4
+    drop_late_chunks: bool = False
     subscriber_queue_size: int = 50
     max_segments_per_stream: int = 500
     shutdown_timeout_seconds: float = 10.0

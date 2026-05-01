@@ -29,7 +29,7 @@ def test_subtitle_segment_response_includes_source_timing_and_processing_latency
     assert response.processing_latency_ms == 1350
 
 
-def test_create_stream_request_uses_safe_defaults_for_broadcast_preview() -> None:
+def test_create_stream_request_preserves_model_for_broadcast_preview() -> None:
     request = CreateStreamRequest(
         source_url="https://example.com/live/broadcast_1.smil/playlist.m3u8",
         external_id="broadcast_1",
@@ -41,7 +41,7 @@ def test_create_stream_request_uses_safe_defaults_for_broadcast_preview() -> Non
     domain = request.to_domain(Settings(default_transcription_model="medium"))
 
     assert domain.language is None
-    assert domain.model == "small"
+    assert domain.model == "medium"
 
 
 def test_create_stream_request_preserves_explicit_allowed_values_for_non_broadcast() -> None:
